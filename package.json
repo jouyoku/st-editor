@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^1.0.2",
+    "pixi.js": "^6.4.2",
     "solid-js": "^1.4.7"
   }
 }
