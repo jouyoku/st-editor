@@ -25,6 +25,10 @@ const SystemMap: Component<{ id: string }> = (props) => {
         setApp(app0);
     });
 
+    function getPoint(R: number, angle: number) {
+        return new Point(R * Math.cos(angle), R * Math.sin(angle));
+    }
+
     function getAngle(point: Point) {
         if (point.x === 0) {
             if (point.y > 0) {
@@ -73,28 +77,90 @@ const SystemMap: Component<{ id: string }> = (props) => {
         return { X, Y, R };
     }
 
-    function edge(p1: Point, p2: Point, p3: Point) {
+    function getDAOffset(p1: Point, p3: Point, dA: number): Point {
+        let dx = 0;
+        let dy = dA;
+        if (p3.x != p1.x) {
+            let an = getAngle(new Point(p3.x - p1.x, p3.y - p1.y));
+            dx = dA * Math.cos(an);
+            dy = dA * Math.sin(an);
+        } else {
+            if (p1.y > p3.y) {
+                dy = -dy;
+            }
+        }
+
+        return new Point(dx, dy);
+    }
+
+    function edge(p1: Point, p2: Point, p3: Point, color = 0x000000, directional = false, p3dA = 0, p1dA = 0) {
         let circle = getCircle(p1, p2, p3);
         let X = circle.X;
         let Y = circle.Y;
         let R = circle.R;
 
-        if (R === Infinity || isNaN(R)) {
+        if (true) {//R === Infinity || isNaN(R)) {
+            let p1O = getDAOffset(p3, p1, p1dA);
+            //let p3O = getDAOffset(p1, p3, p3dA);
+
+            let an3 = getAngle(new Point(p3.x - p1.x, p3.y - p1.y));
+            let p3O = new Point(p3dA * Math.cos(an3), p3dA * Math.sin(an3));
+            if(p3.x === p1.x) {
+                p3O.y = - p3O.y;
+            }
+            let p3o = new Point(p3.x - p3O.x, p3.y - p3O.y);
+
             let line = new Graphics();
             line.lineStyle(2, 0xff0000);
-            line.moveTo(p1.x, p1.y);
-            line.lineTo(p3.x, p3.y);
+            line.moveTo(p1.x - p1O.x, p1.y - p1O.y);
+            line.lineTo(p3o.x, p3o.y);
             app().stage.addChild(line);
-            return;
+            //return;
         }
 
-        let a1 = getAngle(new Point((p1.x - X), (p1.y - Y)));
-        let a3 = getAngle(new Point((p3.x - X), (p3.y - Y)));
+        let clockwise = isClockwise(p1, p2, p3);
+        if (!clockwise) {
+            p1dA = -p1dA;
+            p3dA = -p3dA;
+        }
+
+        let a1 = getAngle(new Point((p1.x - X), (p1.y - Y))) - p1dA / R;
+        let a3 = getAngle(new Point((p3.x - X), (p3.y - Y))) + p3dA / R;
+
+        //console.log(a1 * 360 / Math.PI / 2, a3 * 360 / Math.PI / 2);
 
         let curve = new Graphics();
-        curve.lineStyle(2, 0xff0000);
-        curve.arc(X, Y, R, a1, a3, isClockwise(p1, p2, p3));
+        curve.lineStyle(2, color);
+        curve.arc(X, Y, R, a1, a3, clockwise);
         app().stage.addChild(curve);
+
+        if (!directional) {
+            return;
+        }
+        let dA = 15 / R;
+        if (!clockwise) {
+            dA = -dA;
+        }
+        let dR = 6;
+        let p32 = getPoint(R, a3);
+        p32 = p32.set(p32.x + X, p32.y + Y);
+        let p4 = getPoint(R + dR, a3 + dA);
+        p4 = p4.set(p4.x + X, p4.y + Y);
+        let p5 = getPoint(R - dR, a3 + dA);
+        p5 = p5.set(p5.x + X, p5.y + Y);
+        let arrow = new Graphics();
+        arrow.lineStyle(2, color);
+        arrow.beginFill(color);
+        arrow.moveTo(p32.x, p32.y);
+        arrow.lineTo(p4.x, p4.y);
+        arrow.lineTo(p5.x, p5.y);
+        arrow.lineTo(p32.x, p32.y);
+        arrow.endFill();
+        app().stage.addChild(arrow);
+
+        //let p5 = new Point(p4.x + X, p4.y + Y);
+        //console.log(p5, );
+
     }
 
     function handleMouseMove(event) {
@@ -105,10 +171,10 @@ const SystemMap: Component<{ id: string }> = (props) => {
 
         app().stage.removeChildren();
 
-        let p1 = new Point(100, 100);
+        let p1 = new Point(300, 300);
         let p2 = new Point(event.clientX - offset().x, event.clientY - offset().y);
         let p3 = new Point(300, 100);
-        edge(p1, p2, p3);
+        edge(p1, p2, p3, 0x0000ff, true, 40, 20);
     }
 
     function handleMouseDown(event) {
