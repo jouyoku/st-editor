@@ -99,23 +99,53 @@ const SystemMap: Component<{ id: string }> = (props) => {
         let Y = circle.Y;
         let R = circle.R;
 
-        if (true) {//R === Infinity || isNaN(R)) {
-            let p1O = getDAOffset(p3, p1, p1dA);
-            //let p3O = getDAOffset(p1, p3, p3dA);
-
+        if (R === Infinity || isNaN(R)) {
             let an3 = getAngle(new Point(p3.x - p1.x, p3.y - p1.y));
+            let p1O = new Point(p1dA * Math.cos(an3), p1dA * Math.sin(an3));
+            if (p3.x === p1.x) {
+                p1O.y = - p1O.y;
+            }
+            let p1o = new Point(p1.x + p1O.x, p1.y + p1O.y);
             let p3O = new Point(p3dA * Math.cos(an3), p3dA * Math.sin(an3));
-            if(p3.x === p1.x) {
+            if (p3.x === p1.x) {
                 p3O.y = - p3O.y;
             }
             let p3o = new Point(p3.x - p3O.x, p3.y - p3O.y);
 
             let line = new Graphics();
-            line.lineStyle(2, 0xff0000);
-            line.moveTo(p1.x - p1O.x, p1.y - p1O.y);
+            line.lineStyle(2, color);
+            line.moveTo(p1o.x, p1o.y);
             line.lineTo(p3o.x, p3o.y);
             app().stage.addChild(line);
-            //return;
+
+            if (!directional) {
+                return;
+            }
+            let dA = 15;
+            let p3C = new Point(dA * Math.cos(an3), dA * Math.sin(an3));
+            if (p3.x === p1.x) {
+                p3C.y = - p3C.y;
+            }
+            let p3c = new Point(p3o.x - p3C.x, p3o.y - p3C.y);
+            let an4 = an3 + Math.PI / 2;
+
+            let dR = 6;
+            let p4A = new Point(dR * Math.cos(an4), dR * Math.sin(an4));
+            if (p4A.x === 0) {
+                p4A.y = - p4A.y;
+            }
+            let p4l = new Point(p3c.x - p4A.x, p3c.y - p4A.y);
+            let p5l = new Point(p3c.x + p4A.x, p3c.y + p4A.y);
+            let triangle = new Graphics();
+            triangle.lineStyle(2, color);
+            triangle.beginFill(color);
+            triangle.moveTo(p3o.x, p3o.y);
+            triangle.lineTo(p4l.x, p4l.y);
+            triangle.lineTo(p5l.x, p5l.y);
+            triangle.lineTo(p3o.x, p3o.y);
+            triangle.endFill();
+            app().stage.addChild(triangle);
+            return;
         }
 
         let clockwise = isClockwise(p1, p2, p3);
@@ -126,8 +156,6 @@ const SystemMap: Component<{ id: string }> = (props) => {
 
         let a1 = getAngle(new Point((p1.x - X), (p1.y - Y))) - p1dA / R;
         let a3 = getAngle(new Point((p3.x - X), (p3.y - Y))) + p3dA / R;
-
-        //console.log(a1 * 360 / Math.PI / 2, a3 * 360 / Math.PI / 2);
 
         let curve = new Graphics();
         curve.lineStyle(2, color);
@@ -157,10 +185,6 @@ const SystemMap: Component<{ id: string }> = (props) => {
         arrow.lineTo(p32.x, p32.y);
         arrow.endFill();
         app().stage.addChild(arrow);
-
-        //let p5 = new Point(p4.x + X, p4.y + Y);
-        //console.log(p5, );
-
     }
 
     function handleMouseMove(event) {
@@ -171,9 +195,9 @@ const SystemMap: Component<{ id: string }> = (props) => {
 
         app().stage.removeChildren();
 
-        let p1 = new Point(300, 300);
+        let p1 = new Point(300, 100);
         let p2 = new Point(event.clientX - offset().x, event.clientY - offset().y);
-        let p3 = new Point(300, 100);
+        let p3 = new Point(300, 300);
         edge(p1, p2, p3, 0x0000ff, true, 40, 20);
     }
 
