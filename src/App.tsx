@@ -6,7 +6,7 @@ import SystemMap from './SystemMap/SystemMap';
 const App: Component = () => {
 
   return (
-    <div>
+    <div class="bg-yellow-100">
       <p class="text-4xl text-green-700 text-center py-5">Hello tailwind!</p>
       <SystemMap id="abc" />
     </div>

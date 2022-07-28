@@ -1,5 +1,5 @@
 import { Component, onMount, createSignal } from 'solid-js';
-import { Application, Graphics, Text, Point } from './pixi.js'
+import { Application, Graphics, Point, Text, TextStyle } from './pixi.js'
 
 class Arc {
     cx: number;
@@ -55,6 +55,7 @@ const SystemMap: Component<{ id: string }> = (props) => {
             resolution: window.devicePixelRatio || 1,
             autoDensity: true,
             backgroundColor: 0xffff80,
+            backgroundAlpha: 0,
             width: 640,
             height: 480
         });
@@ -207,7 +208,7 @@ const SystemMap: Component<{ id: string }> = (props) => {
         if (!vars.anticlockwise) {
             dA = -dA;
             p3Offset = -p3Offset;
-       }
+        }
         let dR = arrowWidth / 2;
         let angle = vars.endAngle + p3Offset / vars.radius;
         let p3a = getXY4Arc(vars.radius, angle);
@@ -237,6 +238,98 @@ const SystemMap: Component<{ id: string }> = (props) => {
         drawTriangle(points[0], points[1], points[2], color);
     }
 
+    function getTextPointP3(p1: Point, p2: Point, p3: Point, right = 20, p3Offset = 0): Point {
+        let vars = getEdgeVars(p1, p2, p3);
+        if (vars instanceof Line) {
+            let angle = getAngle(new Point(p3.x - p1.x, p3.y - p1.y));
+            let p3XY = getXY4Line(p3Offset, angle);
+
+            let end = new Point(p3.x - p3XY.x, p3.y - p3XY.y);
+
+            let angle2 = angle + Math.PI / 2;
+            let p4A = getXY4Line(right, angle2);
+
+            if (angle2 === (Math.PI / 2) || angle2 === (Math.PI * 3 / 2)) {
+                p4A.y = -p4A.y;
+            }
+            if (angle2 === (Math.PI * 2) || angle2 === Math.PI) {
+                p4A.x = -p4A.x;
+            }
+            return new Point(end.x + p4A.x, end.y + p4A.y);
+        }
+
+        if (!vars.anticlockwise) {
+            p3Offset = -p3Offset;
+        }
+
+        let end = vars.endAngle + p3Offset / vars.radius;
+
+        let r1 = right;
+        if (!vars.anticlockwise) {
+            r1 = -r1;
+        }
+
+        let tmp = getXY4Arc(vars.radius + r1, end);
+        return new Point(vars.cx + tmp.x, vars.cy + tmp.y);
+    }
+
+    function getTextPoint(p1: Point, p2: Point, p3: Point, percent = 50, right = 20, p1Offset = 0, p3Offset = 0): Point {
+        let vars = getEdgeVars(p1, p2, p3);
+        if (vars instanceof Line) {
+            let angle = getAngle(new Point(p3.x - p1.x, p3.y - p1.y));
+            let p1XY = getXY4Line(p1Offset, angle);
+            let p3XY = getXY4Line(p3Offset, angle);
+
+            let start = new Point(p1.x + p1XY.x, p1.y + p1XY.y);
+            let end = new Point(p3.x - p3XY.x, p3.y - p3XY.y);
+
+            let position = new Point((end.x - start.x) * percent / 100 + start.x, (end.y - start.y) * percent / 100 + start.y);
+            let angle2 = angle + Math.PI / 2;
+            let p4A = getXY4Line(right, angle2);
+            if (angle2 === (Math.PI / 2) || angle2 === (Math.PI * 3 / 2)) {
+                p4A.y = -p4A.y;
+            }
+            if (angle2 === (Math.PI * 2) || angle2 === Math.PI) {
+                p4A.x = -p4A.x;
+            }
+            return new Point(position.x + p4A.x, position.y + p4A.y);
+        }
+
+        if (!vars.anticlockwise) {
+            p1Offset = -p1Offset;
+            p3Offset = -p3Offset;
+        }
+
+        let start = vars.startAngle - p1Offset / vars.radius;
+        let end = vars.endAngle + p3Offset / vars.radius;
+
+        if (!vars.anticlockwise) {
+            if (start > end) {
+                end += Math.PI * 2;
+            }
+        } else {
+            if (start < end) {
+                start += Math.PI * 2;
+            }
+        }
+
+        let position = (end - start) * percent / 100 + start;
+        let r1 = right;
+        if (!vars.anticlockwise) {
+            r1 = -r1;
+        }
+
+        let tmp = getXY4Arc(vars.radius + r1, position);
+        return new Point(vars.cx + tmp.x, vars.cy + tmp.y);
+    }
+
+    function drawText(position: Point, content: string, style: TextStyle = {}) {
+        let text = new Text(content, style);
+        text.x = position.x - text.width / 2;
+        text.y = position.y - text.height / 2;
+        app().stage.addChild(text);
+    }
+
     function handleMouseMove(event) {
         setPos1({
             x: event.clientX - offset().x,
@@ -247,10 +340,17 @@ const SystemMap: Component<{ id: string }> = (props) => {
 
         let p1 = new Point(300, 100);
         let p2 = new Point(event.clientX - offset().x, event.clientY - offset().y);
-        let p3 = new Point(300, 300);
+        let p3 = new Point(100, 300);
+
         drawArrow(p3, p2, p1, 0xff00ff, 15, 12, 20);
         drawEdge(p1, p2, p3, 0x00ff00, 20, 40);
         drawArrow(p1, p2, p3, 0x00ff00, 15, 12, 40);
+
+        let pt = getTextPointP3(p1, p2, p3, 20, 80);
+        drawText(pt, '+');
+
+        let pt2 = getTextPoint(p1, p2, p3, 50, 40);
+        drawText(pt2, 'bala');
     }
 
     function handleMouseDown(event) {
