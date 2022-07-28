@@ -1,5 +1,5 @@
 import { Component, onMount, createSignal } from 'solid-js';
-import { Application, Graphics, Point, Text, TextStyle } from './pixi.js'
+import { Application, Graphics, Point, Text, TextStyle, LineStyle } from './pixi.js'
 
 class Arc {
     cx: number;
@@ -155,17 +155,35 @@ const SystemMap: Component<{ id: string }> = (props) => {
         return new Arc(cx, cy, radius, startAngle, endAngle, anticlockwise);
     }
 
-    function drawEdge(p1: Point, p2: Point, p3: Point, color = 0x000000, p1Offset = 0, p3Offset = 0) {
+    function drawEdge(p1: Point, p2: Point, p3: Point, style = { width: 2, color: 0x000000 }, p1Offset = 0, p3Offset = 0, gap = 0, solid = 8) {
         let vars = getEdgeVars(p1, p2, p3);
         if (vars instanceof Line) {
             let angle = getAngle(new Point(p3.x - p1.x, p3.y - p1.y));
             let p1XY = getXY4Line(p1Offset, angle);
             let p3XY = getXY4Line(p3Offset, angle);
 
+            let start = new Point(p1.x + p1XY.x, p1.y + p1XY.y);
+            let end = new Point(p3.x - p3XY.x, p3.y - p3XY.y);
+
             let line = new Graphics();
-            line.lineStyle(2, color);
-            line.moveTo(p1.x + p1XY.x, p1.y + p1XY.y);
-            line.lineTo(p3.x - p3XY.x, p3.y - p3XY.y);
+            line.lineStyle(style);
+            line.moveTo(start.x, start.y);
+            if (gap === 0) {
+                line.lineTo(end.x, end.y);
+            } else {
+                let solidXY = getXY4Line(solid, angle);
+                let gapXY = getXY4Line(gap, angle);
+                let index = start;
+                do {
+                    index = new Point(index.x + solidXY.x, index.y + solidXY.y);
+                    if (((index.x - start.x) ** 2 + (index.y - start.y) ** 2) > ((end.x - start.x) ** 2 + (end.y - start.y) ** 2)) {
+                        index = end;
+                    }
+                    line.lineTo(index.x, index.y);
+                    index = new Point(index.x + gapXY.x, index.y + gapXY.y);
+                    line.moveTo(index.x, index.y);
+                } while (((index.x - start.x) ** 2 + (index.y - start.y) ** 2) < ((end.x - start.x) ** 2 + (end.y - start.y) ** 2));
+            }
             app().stage.addChild(line);
             return;
         }
@@ -173,18 +191,60 @@ const SystemMap: Component<{ id: string }> = (props) => {
         if (!vars.anticlockwise) {
             p1Offset = -p1Offset;
             p3Offset = -p3Offset;
+            gap = -gap;
+            solid = -solid;
+        }
+
+        let start = vars.startAngle - p1Offset / vars.radius;
+        let end = vars.endAngle + p3Offset / vars.radius;
+
+        if (!vars.anticlockwise) {
+            if (start > end) {
+                end += Math.PI * 2;
+            }
+        } else {
+            if (start < end) {
+                start += Math.PI * 2;
+            }
         }
 
         let curve = new Graphics();
-        curve.lineStyle(2, color);
-        curve.arc(
-            vars.cx,
-            vars.cy,
-            vars.radius,
-            vars.startAngle - p1Offset / vars.radius,
-            vars.endAngle + p3Offset / vars.radius,
-            vars.anticlockwise
-        );
+        curve.lineStyle(style);
+        let startXY = getXY4Arc(vars.radius, start);
+        startXY = startXY.set(startXY.x + vars.cx, startXY.y + vars.cy);
+        curve.moveTo(startXY.x, startXY.y);
+        if (gap === 0) {
+            curve.arc(
+                vars.cx,
+                vars.cy,
+                vars.radius,
+                start,
+                end,
+                vars.anticlockwise
+            );
+        } else {
+            let solidA = solid / vars.radius;
+            let gapA = gap / vars.radius;
+            let index = start;
+            do {
+                let index1 = index - solidA;
+                if (Math.abs(index1 - start) > Math.abs(end - start)) {
+                    index1 = end;
+                }
+                curve.arc(
+                    vars.cx,
+                    vars.cy,
+                    vars.radius,
+                    index,
+                    index1,
+                    vars.anticlockwise
+                );
+                index = index1 - gapA;
+                let indexXY = getXY4Arc(vars.radius, index);
+                indexXY = indexXY.set(indexXY.x + vars.cx, indexXY.y + vars.cy);
+                curve.moveTo(indexXY.x, indexXY.y);
+            } while (Math.abs(index - start) < Math.abs(end - start));
+        }
         app().stage.addChild(curve);
     }
 
@@ -221,10 +281,10 @@ const SystemMap: Component<{ id: string }> = (props) => {
         return [p3a, p4, p5];
     }
 
-    function drawTriangle(p1: Point, p2: Point, p3: Point, color = 0x000000) {
+    function drawTriangle(p1: Point, p2: Point, p3: Point, style = { width: 2, color: 0x000000 }) {
         let triangle = new Graphics();
-        triangle.lineStyle(2, color);
-        triangle.beginFill(color);
+        triangle.lineStyle(style);
+        triangle.beginFill(style.color);
         triangle.moveTo(p1.x, p1.y);
         triangle.lineTo(p2.x, p2.y);
         triangle.lineTo(p3.x, p3.y);
@@ -233,9 +293,9 @@ const SystemMap: Component<{ id: string }> = (props) => {
         app().stage.addChild(triangle);
     }
 
-    function drawArrow(p1: Point, p2: Point, p3: Point, color = 0x000000, arrowLength = 15, arrowWidth = 12, p3Offset = 0) {
+    function drawArrow(p1: Point, p2: Point, p3: Point, style = { width: 2, color: 0x000000 }, arrowLength = 15, arrowWidth = 12, p3Offset = 0) {
         let points = getArrow(p1, p2, p3, arrowLength, arrowWidth, p3Offset);
-        drawTriangle(points[0], points[1], points[2], color);
+        drawTriangle(points[0], points[1], points[2], style);
     }
 
     function getTextPointP3(p1: Point, p2: Point, p3: Point, right = 20, p3Offset = 0): Point {
@@ -338,13 +398,13 @@ const SystemMap: Component<{ id: string }> = (props) => {
 
         app().stage.removeChildren();
 
-        let p1 = new Point(300, 100);
+        let p1 = new Point(300, 300);
         let p2 = new Point(event.clientX - offset().x, event.clientY - offset().y);
-        let p3 = new Point(100, 300);
+        let p3 = new Point(300, 100);
 
-        drawArrow(p3, p2, p1, 0xff00ff, 15, 12, 20);
-        drawEdge(p1, p2, p3, 0x00ff00, 20, 40);
-        drawArrow(p1, p2, p3, 0x00ff00, 15, 12, 40);
+        //drawArrow(p3, p2, p1, { width: 3, color: 0xff00ff }, 15, 12, 20);
+        drawEdge(p1, p2, p3, { width: 3, color: 0x0000ff }, 20, 40, 8, 8);
+        drawArrow(p1, p2, p3, { width: 3, color: 0x0000ff }, 15, 12, 40);
 
         let pt = getTextPointP3(p1, p2, p3, 20, 80);
         drawText(pt, '+');
